@@ -1,22 +1,27 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 func main() {
-	elements := Elements{
-		NodeCoordinates: []Point3D{
-			{0.0, 0.0, 0.0},  // A
-			{1.0, 0.0, 2.0},  // B
-			{2.0, 1.0, 0.0},  // C
-			{2.0, -1.0, 0.0}, // D
-			{3.0, 0.0, 2.0},  // E
-			{4.0, 0.0, 0.0},  // F
-		},
-		Tets: []Tet{
-			{1, 2, 3, 4},
-			{2, 3, 4, 5},
-			{3, 4, 5, 6},
-		},
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s <mesh-file>\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	f, err := os.Open(os.Args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	elements, err := ParseMesh(f)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println(ASCIIArtFromElements(elements, 50, 15))

@@ -232,6 +232,122 @@ func TestDrawEdge_OutOfBounds(t *testing.T) {
 	DrawEdgeHiddenLine(canvas, -1, -1, 0.0, 5, 5, 0.0, buf, 1e-6)
 }
 
+func TestParseMesh_Valid(t *testing.T) {
+	input := `# sample mesh
+nodes
+0.0  0.0  0.0
+1.0  0.0  2.0
+2.0  1.0  0.0
+
+tets
+1 2 3 1
+`
+	elems, err := ParseMesh(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(elems.NodeCoordinates) != 3 {
+		t.Errorf("got %d nodes, want 3", len(elems.NodeCoordinates))
+	}
+}
+
+func TestParseMesh_ValidNodeValues(t *testing.T) {
+	input := "nodes\n1.5 -2.0 3.0\n\ntets\n1 1 1 1\n"
+	elems, err := ParseMesh(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := Point3D{1.5, -2.0, 3.0}
+	if elems.NodeCoordinates[0] != want {
+		t.Errorf("got %v, want %v", elems.NodeCoordinates[0], want)
+	}
+}
+
+func TestParseMesh_ValidTetValues(t *testing.T) {
+	input := "nodes\n0 0 0\n\ntets\n1 2 3 4\n"
+	elems, err := ParseMesh(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := Tet{1, 2, 3, 4}
+	if elems.Tets[0] != want {
+		t.Errorf("got %v, want %v", elems.Tets[0], want)
+	}
+}
+
+func TestParseMesh_CommentsAndBlanks(t *testing.T) {
+	input := `
+# this is a comment
+
+nodes
+# another comment
+0 0 0
+1 1 1
+
+# comment between sections
+
+tets
+
+# comment in tets
+1 2 1 2
+`
+	elems, err := ParseMesh(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(elems.NodeCoordinates) != 2 {
+		t.Errorf("got %d nodes, want 2", len(elems.NodeCoordinates))
+	}
+}
+
+func TestParseMesh_MissingNodes(t *testing.T) {
+	input := "tets\n1 2 3 4\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for missing nodes section")
+	}
+}
+
+func TestParseMesh_MissingTets(t *testing.T) {
+	input := "nodes\n0 0 0\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for missing tets section")
+	}
+}
+
+func TestParseMesh_BadNodeLine(t *testing.T) {
+	input := "nodes\n1.0 2.0\n\ntets\n1 2 3 4\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for node line with 2 fields")
+	}
+}
+
+func TestParseMesh_BadTetLine(t *testing.T) {
+	input := "nodes\n0 0 0\n\ntets\n1 2 3\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for tet line with 3 fields")
+	}
+}
+
+func TestParseMesh_InvalidFloat(t *testing.T) {
+	input := "nodes\nabc 0 0\n\ntets\n1 1 1 1\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for non-numeric node coordinate")
+	}
+}
+
+func TestParseMesh_InvalidInt(t *testing.T) {
+	input := "nodes\n0 0 0\n\ntets\n1 abc 3 4\n"
+	_, err := ParseMesh(strings.NewReader(input))
+	if err == nil {
+		t.Error("expected error for non-integer tet index")
+	}
+}
+
 var sampleElements = Elements{
 	NodeCoordinates: []Point3D{
 		{0.0, 0.0, 0.0},

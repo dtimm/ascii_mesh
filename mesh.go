@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
+	"io"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -26,6 +30,85 @@ type Elements struct {
 // ProjectedPoint holds screen coordinates and depth.
 type ProjectedPoint struct {
 	U, V, Depth float64
+}
+
+// ParseMesh reads a mesh file from r and returns the parsed Elements.
+// The format has "nodes" and "tets" section headers.
+// Lines starting with # are comments; blank lines are ignored.
+func ParseMesh(r io.Reader) (Elements, error) {
+	var elems Elements
+	var section string
+	hasNodes := false
+	hasTets := false
+
+	scanner := bufio.NewScanner(r)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if line == "nodes" {
+			section = "nodes"
+			hasNodes = true
+			continue
+		}
+		if line == "tets" {
+			section = "tets"
+			hasTets = true
+			continue
+		}
+
+		fields := strings.Fields(line)
+
+		switch section {
+		case "nodes":
+			if len(fields) != 3 {
+				return elems, fmt.Errorf("line %d: expected 3 coordinates, got %d", lineNum, len(fields))
+			}
+			var p Point3D
+			for i, f := range fields {
+				v, err := strconv.ParseFloat(f, 64)
+				if err != nil {
+					return elems, fmt.Errorf("line %d: invalid coordinate %q: %w", lineNum, f, err)
+				}
+				p[i] = v
+			}
+			elems.NodeCoordinates = append(elems.NodeCoordinates, p)
+
+		case "tets":
+			if len(fields) != 4 {
+				return elems, fmt.Errorf("line %d: expected 4 node indices, got %d", lineNum, len(fields))
+			}
+			var tet Tet
+			for i, f := range fields {
+				v, err := strconv.Atoi(f)
+				if err != nil {
+					return elems, fmt.Errorf("line %d: invalid index %q: %w", lineNum, f, err)
+				}
+				tet[i] = v
+			}
+			elems.Tets = append(elems.Tets, tet)
+
+		default:
+			return elems, fmt.Errorf("line %d: data before any section header", lineNum)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return elems, err
+	}
+	if !hasNodes {
+		return elems, fmt.Errorf("missing 'nodes' section")
+	}
+	if !hasTets {
+		return elems, fmt.Errorf("missing 'tets' section")
+	}
+
+	return elems, nil
 }
 
 // BuildEdges extracts unique edges from tetrahedra.
